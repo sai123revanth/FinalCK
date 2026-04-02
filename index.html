@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CashKaro | Smart Bubble MVP (HyperOPS)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.260.0/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        ck: { orange: '#FF5722', dark: '#0B0F19', border: '#2A3441' },
+                        store: { blue: '#2874F0', yellow: '#FFE500', gray: '#f1f3f6' }
+                    },
+                    animation: {
+                        'pulse-ring': 'pulseRing 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'scan': 'scan 1.5s linear infinite',
+                    },
+                    keyframes: {
+                        pulseRing: {
+                            '0%': { transform: 'scale(0.8)', opacity: '0.5' },
+                            '100%': { transform: 'scale(1.5)', opacity: '0' }
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        scan: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(100%)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f1f3f6; }
+        
+        /* Extension UI Styling */
+        .ck-glass {
+            background: rgba(11, 15, 25, 0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 87, 34, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 87, 34, 0.1);
+        }
+        
+        .bubble-panel {
+            transform-origin: bottom right;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .bubble-panel.hidden-panel {
+            opacity: 0;
+            transform: scale(0.85) translateY(20px);
+            pointer-events: none;
+        }
+        
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2A3441; border-radius: 4px; }
+        .ck-scroll::-webkit-scrollbar-thumb { background: #FF5722; }
+
+        /* Scanner Line */
+        .scanner-line {
+            background: linear-gradient(to bottom, transparent, #FF5722, transparent);
+        }
+    </style>
+</head>
+<body class="font-sans text-gray-800 h-screen overflow-x-hidden flex flex-col relative">
+
+    <!-- ========================================== -->
+    <!-- FLIPKART BACKGROUND (THE CONTEXT)          -->
+    <!-- ========================================== -->
+    
+    <!-- Store Navbar -->
+    <nav class="bg-store-blue text-white sticky top-0 z-10 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-8">
+                <div class="flex flex-col">
+                    <div class="font-bold text-2xl italic tracking-tighter flex items-center leading-none">
+                        Flipkart
+                    </div>
+                    <div class="text-[10px] italic hover:underline cursor-pointer text-gray-200 flex items-center gap-1">
+                        Explore <span class="text-store-yellow font-bold">Plus</span>
+                        <i data-lucide="sparkles" class="w-3 h-3 text-store-yellow"></i>
+                    </div>
+                </div>
+                <div class="hidden md:flex w-96 relative">
+                    <input type="text" placeholder="Search for products, brands and more" class="w-full py-2 px-4 rounded-sm text-black focus:outline-none shadow-inner">
+                    <i data-lucide="search" class="absolute right-3 top-2 text-store-blue w-5 h-5"></i>
+                </div>
+            </div>
+            <div class="flex items-center gap-6 font-medium text-sm">
+                <button class="bg-white text-store-blue px-8 py-1.5 rounded-sm font-bold">Login</button>
+                <span class="hidden sm:block cursor-pointer font-bold">Become a Seller</span>
+                <span class="hidden sm:block cursor-pointer font-bold flex items-center gap-1">More <i data-lucide="chevron-down" class="w-4 h-4"></i></span>
+                <div class="flex items-center gap-1 cursor-pointer font-bold">
+                    <i data-lucide="shopping-cart" class="w-5 h-5"></i> Cart
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Product Page Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+        <div class="bg-white p-6 shadow-sm flex flex-col md:flex-row gap-8 min-h-[600px] rounded-sm">
+            
+            <!-- Product Image Left -->
+            <div class="w-full md:w-5/12 flex flex-col items-center">
+                <div class="w-full aspect-square border border-gray-200 flex items-center justify-center p-8 relative group">
+                    <img src="https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" alt="Headphones" class="object-contain h-full w-full group-hover:scale-105 transition-transform duration-300">
+                    <div class="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow">Bestseller</div>
+                </div>
+                <div class="flex w-full gap-4 mt-4">
+                    <button class="flex-1 bg-store-yellow text-black font-bold py-4 rounded-sm shadow hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2">
+                        <i data-lucide="shopping-cart" class="w-5 h-5"></i> ADD TO CART
+                    </button>
+                    <button class="flex-1 bg-ck-orange text-white font-bold py-4 rounded-sm shadow hover:bg-orange-600 transition-colors flex items-center justify-center gap-2">
+                        <i data-lucide="zap" class="w-5 h-5 fill-current"></i> BUY NOW
+                    </button>
+                </div>
+            </div>
+
+            <!-- Product Details Right -->
+            <div class="w-full md:w-7/12">
+                <div class="text-sm text-gray-500 mb-2 hover:text-store-blue cursor-pointer transition-colors">Home > Electronics > Audio > Headphones > AcoustiMax</div>
+                <h1 class="text-2xl font-medium text-gray-900 leading-tight mb-2">AcoustiMax Pro Active Noise Cancelling Wireless Bluetooth Headphones</h1>
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="bg-green-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1 shadow-sm">4.6 <i data-lucide="star" class="w-3 h-3 fill-current"></i></span>
+                    <span class="text-gray-500 text-sm font-medium">14,231 Ratings & 1,420 Reviews</span>
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Flipkart_logo.svg/200px-Flipkart_logo.svg.png" class="h-5 ml-2 opacity-50 grayscale" alt="Assured">
+                </div>
+
+                <div class="mb-6">
+                    <div class="text-green-600 font-medium text-sm mb-1">Special price</div>
+                    <div class="flex items-end gap-3">
+                        <span id="store-price" class="text-4xl font-bold">₹9,999</span>
+                        <span class="text-gray-500 line-through text-lg">₹14,999</span>
+                        <span class="text-green-600 font-bold text-lg">33% off</span>
+                    </div>
+                </div>
+
+                <!-- Applied Deal Toast (Hidden initially) -->
+                <div id="store-applied-toast" class="hidden bg-green-50 border border-green-200 text-green-800 px-4 py-4 rounded-lg mb-6 shadow-sm transition-all">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-start gap-3">
+                            <div class="bg-green-100 p-1.5 rounded-full mt-0.5">
+                                <i data-lucide="check-circle-2" class="w-5 h-5 text-green-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-green-900">HyperOPS Deal Activated!</h4>
+                                <ul class="text-sm mt-1 space-y-1" id="store-savings-list">
+                                    <li class="flex items-center gap-2"><i data-lucide="zap" class="w-3 h-3 text-ck-orange"></i> 5% Flat Cashback applied</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="block text-xs text-green-600 font-bold uppercase tracking-wider mb-1">Total Saved</span>
+                            <span class="text-xl font-black text-green-700" id="store-total-saved">₹500</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fake Offers Section -->
+                <div class="space-y-3 mb-8">
+                    <h3 class="font-medium text-gray-900">Available offers</h3>
+                    <div class="flex gap-2 text-sm">
+                        <i data-lucide="tag" class="w-4 h-4 text-green-600 shrink-0 mt-0.5"></i>
+                        <p><span class="font-medium">Bank Offer:</span> 5% Cashback on Flipkart Axis Bank Card <span class="text-store-blue font-medium cursor-pointer hover:underline">T&C</span></p>
+                    </div>
+                    <div class="flex gap-2 text-sm">
+                        <i data-lucide="tag" class="w-4 h-4 text-green-600 shrink-0 mt-0.5"></i>
+                        <p><span class="font-medium">Special Price:</span> Get extra ₹1000 off (price inclusive of cashback/coupon) <span class="text-store-blue font-medium cursor-pointer hover:underline">T&C</span></p>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-200 pt-6 flex gap-16 text-sm">
+                    <div class="text-gray-500 font-medium w-24">Delivery</div>
+                    <div>
+                        <div class="font-medium text-black">Delivery by Tomorrow | <span class="text-green-600">Free</span> <span class="line-through text-gray-500">₹40</span></div>
+                        <div class="text-gray-500 text-xs mt-1">Order within 4 hrs 30 mins</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+    <!-- ========================================== -->
+    <!-- HYPEROPS / CASHKARO BUBBLE ECOSYSTEM       -->
+    <!-- ========================================== -->
+    
+    <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        
+        <!-- The Expanded Extension Panel -->
+        <div id="ck-panel" class="bubble-panel hidden-panel ck-glass w-80 sm:w-96 rounded-2xl mb-4 text-white overflow-hidden flex flex-col max-h-[550px]" onclick="event.stopPropagation()">
+            
+            <!-- Header -->
+            <div class="bg-gray-900/80 p-4 border-b border-gray-800 flex justify-between items-center relative overflow-hidden shrink-0">
+                <div class="absolute inset-0 bg-gradient-to-r from-ck-orange/10 to-transparent pointer-events-none"></div>
+                <div class="flex items-center gap-3 relative z-10">
+                    <div class="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-[0_0_15px_rgba(255,87,34,0.3)]">
+                        <span class="text-ck-orange font-black text-sm italic tracking-tighter">CK</span>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm tracking-wide">HyperOPS Intercept</h3>
+                        <div class="flex items-center gap-1.5 mt-0.5">
+                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                            <p class="text-[10px] text-green-400 font-mono tracking-widest uppercase">M.I.N.D. Logic Online</p>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="toggleBubble(event)" class="text-gray-400 hover:text-white transition-colors bg-gray-800 hover:bg-gray-700 p-1.5 rounded-full">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Custom Tabs -->
+            <div class="flex border-b border-gray-800 text-xs font-bold bg-gray-900/50 shrink-0">
+                <button onclick="switchTab('tab-deals')" id="btn-tab-deals" class="flex-1 py-3 text-ck-orange border-b-2 border-ck-orange transition-colors flex items-center justify-center gap-1.5">
+                    <i data-lucide="zap" class="w-3.5 h-3.5"></i> Intercept
+                </button>
+                <button onclick="switchTab('tab-wallet')" id="btn-tab-wallet" class="flex-1 py-3 text-gray-400 hover:text-white border-b-2 border-transparent transition-colors flex items-center justify-center gap-1.5">
+                    <i data-lucide="wallet" class="w-3.5 h-3.5"></i> Syndicate
+                </button>
+                <button onclick="switchTab('tab-ai')" id="btn-tab-ai" class="flex-1 py-3 text-gray-400 hover:text-white border-b-2 border-transparent transition-colors flex items-center justify-center gap-1.5">
+                    <i data-lucide="cpu" class="w-3.5 h-3.5"></i> M.I.N.D.
+                </button>
+            </div>
+
+            <!-- Scrollable Content Area -->
+            <div class="overflow-y-auto ck-scroll flex-grow relative">
+                
+                <!-- TAB 1: INTERCEPT DEALS -->
+                <div id="tab-deals" class="p-5 space-y-4">
+                    
+                    <!-- Context Box -->
+                    <div class="bg-gray-800/50 rounded-xl p-3 border border-gray-700 flex items-start gap-3">
+                        <div class="bg-store-blue/20 rounded-lg p-2 shrink-0 border border-store-blue/30">
+                            <i data-lucide="shopping-bag" class="w-5 h-5 text-store-blue"></i>
+                        </div>
+                        <div>
+                            <p class="text-[11px] text-gray-400 leading-tight">Detected intent on <span class="text-white font-semibold">Flipkart</span> for <span class="text-white font-semibold">AcoustiMax Pro</span>.</p>
+                        </div>
+                    </div>
+
+                    <!-- Cashback Deal Card -->
+                    <div class="bg-gradient-to-br from-gray-800 to-gray-900 border border-ck-orange/40 rounded-xl p-4 relative overflow-hidden group shadow-lg">
+                        <div class="absolute -right-6 -top-6 w-24 h-24 bg-ck-orange/10 rounded-full blur-2xl group-hover:bg-ck-orange/30 transition-colors duration-500"></div>
+                        <div class="flex justify-between items-start mb-2">
+                            <p class="text-[10px] bg-ck-orange/20 text-ck-orange px-2 py-0.5 rounded font-bold uppercase tracking-wider border border-ck-orange/30">Guaranteed</p>
+                            <i data-lucide="shield-check" class="w-4 h-4 text-green-400"></i>
+                        </div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="text-3xl font-black text-white">Flat 5%</span>
+                            <span class="text-sm font-medium text-gray-300">Cashback</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-4">Max ₹500. Automatically tracks in 5 mins.</p>
+                        
+                        <button id="activate-btn" onclick="activateDeal()" class="w-full bg-ck-orange hover:bg-orange-600 text-white font-bold py-2.5 px-4 rounded-lg transition-all flex items-center justify-center gap-2 transform active:scale-95 shadow-md relative overflow-hidden group/btn">
+                            <span class="absolute inset-0 w-0 bg-white/20 transition-all duration-300 ease-out group-hover/btn:w-full"></span>
+                            <i data-lucide="zap" class="w-4 h-4 fill-current relative z-10"></i>
+                            <span class="relative z-10" id="activate-text">1-Tap Activate</span>
+                        </button>
+                    </div>
+
+                    <!-- Coupon Auto-Apply Feature -->
+                    <div id="coupon-section" class="bg-gray-800 rounded-xl border border-gray-700 p-4 relative overflow-hidden">
+                        <div class="flex justify-between items-center mb-3">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="ticket" class="w-4 h-4 text-yellow-400"></i>
+                                <span class="text-sm font-bold">Auto-Apply Coupons</span>
+                            </div>
+                            <span class="text-xs font-mono bg-gray-900 px-1.5 py-0.5 rounded border border-gray-600">4 Found</span>
+                        </div>
+                        
+                        <!-- Scanner UI (Hidden Initially) -->
+                        <div id="coupon-scanner" class="hidden w-full h-12 bg-gray-900 rounded border border-gray-700 relative overflow-hidden flex items-center justify-center font-mono text-xs mb-3">
+                            <div class="absolute inset-0 scanner-line animate-scan opacity-50 w-full h-full"></div>
+                            <span id="scanner-text" class="text-green-400 relative z-10">INITIATING SCAN...</span>
+                        </div>
+
+                        <button id="apply-coupons-btn" onclick="runCouponScanner()" class="w-full bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2.5 rounded-lg transition-colors border border-gray-600 flex justify-center items-center gap-2">
+                            <i data-lucide="search" class="w-3.5 h-3.5"></i> Test 4 Promo Codes
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB 2: SYNDICATE WALLET -->
+                <div id="tab-wallet" class="hidden p-5 space-y-5">
+                    <div class="text-center">
+                        <p class="text-xs text-gray-400 uppercase tracking-widest font-bold mb-1">HyperOPS Wallet</p>
+                        <h2 class="text-4xl font-black text-white" id="wallet-balance-display">₹12,450</h2>
+                        <p class="text-xs text-green-400 mt-1 flex items-center justify-center gap-1">
+                            <i data-lucide="trending-up" class="w-3 h-3"></i> Top 15% in Campus
+                        </p>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                        <div class="flex justify-between items-end mb-2">
+                            <span class="text-sm font-bold text-white">DTU Faction Battle</span>
+                            <span class="text-xs font-mono text-ck-orange">Rank #3</span>
+                        </div>
+                        <!-- Progress Bar -->
+                        <div class="w-full h-2.5 bg-gray-900 rounded-full overflow-hidden mb-2 border border-gray-700">
+                            <div class="h-full bg-gradient-to-r from-ck-orange to-orange-400 w-[75%] relative">
+                                <div class="absolute inset-0 bg-white/20 w-full animate-pulse"></div>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-gray-400 text-right">Only ₹1,200 to beat Mechanical Eng.!</p>
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Recent Extractions</p>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center bg-gray-800/50 p-2.5 rounded-lg border border-gray-700">
+                                <div class="flex items-center gap-2">
+                                    <div class="bg-gray-700 p-1.5 rounded"><i data-lucide="pizza" class="w-3.5 h-3.5 text-gray-300"></i></div>
+                                    <span class="text-xs font-medium">Zomato Late Night</span>
+                                </div>
+                                <span class="text-xs font-mono text-green-400">+₹50.00</span>
+                            </div>
+                            <div class="flex justify-between items-center bg-gray-800/50 p-2.5 rounded-lg border border-gray-700">
+                                <div class="flex items-center gap-2">
+                                    <div class="bg-gray-700 p-1.5 rounded"><i data-lucide="server" class="w-3.5 h-3.5 text-gray-300"></i></div>
+                                    <span class="text-xs font-medium">AWS Student Tier</span>
+                                </div>
+                                <span class="text-xs font-mono text-green-400">+₹100.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: M.I.N.D. AI -->
+                <div id="tab-ai" class="hidden p-5 space-y-4">
+                    <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 font-mono text-xs">
+                        <div class="flex items-center gap-2 border-b border-gray-800 pb-2 mb-3">
+                            <i data-lucide="cpu" class="w-4 h-4 text-ck-orange"></i>
+                            <span class="text-gray-400">Price Prediction Matrix</span>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <p class="text-gray-500 mb-1">> CURRENT_PRICE_ANALYSIS</p>
+                                <p class="text-green-400 font-bold flex justify-between">
+                                    <span>Status: OPTIMAL</span>
+                                    <span>Score: 94/100</span>
+                                </p>
+                                <p class="text-[10px] text-gray-400 mt-1">Price is currently at a 30-day low.</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 mb-1">> STOCK_PREDICTION</p>
+                                <p class="text-yellow-400 font-bold">WARNING: HIGH DEMAND</p>
+                                <p class="text-[10px] text-gray-400 mt-1">Expected to stock out within 48 hours based on historic festival sale velocity.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-ck-orange/10 border border-ck-orange/30 rounded-xl p-4 text-center">
+                        <i data-lucide="bot" class="w-6 h-6 text-ck-orange mx-auto mb-2"></i>
+                        <h4 class="text-sm font-bold text-white mb-1">M.I.N.D. Verdict</h4>
+                        <p class="text-xs text-gray-300 leading-relaxed">Combine the <span class="font-bold text-white">5% Cashback</span> with the auto-applied <span class="font-bold text-white">SAVE200</span> coupon immediately to maximize ROI.</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-[#050810] p-2.5 text-center border-t border-gray-800 flex justify-center items-center gap-2 shrink-0">
+                <i data-lucide="shield-check" class="w-3 h-3 text-gray-500"></i>
+                <span class="text-[10px] text-gray-500 font-medium">Secured by HyperOPS Operations Framework</span>
+            </div>
+        </div>
+
+        <!-- The Floating Trigger Bubble -->
+        <div id="ck-bubble-trigger" class="relative group cursor-pointer animate-float" onclick="toggleBubble(event)">
+            
+            <!-- Tooltip Prompt -->
+            <div id="bubble-tooltip" class="absolute right-[110%] top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs font-bold py-2.5 px-4 rounded-xl whitespace-nowrap shadow-xl border border-gray-700 mr-2 opacity-100 transition-opacity duration-300 pointer-events-none">
+                <div class="flex flex-col gap-0.5">
+                    <span class="text-[10px] text-ck-orange uppercase tracking-wider">Action Required</span>
+                    <span>Activate ₹500 Cashback!</span>
+                </div>
+                <div class="absolute top-1/2 -right-1 -translate-y-1/2 border-t-4 border-t-transparent border-b-4 border-b-transparent border-l-4 border-l-gray-900"></div>
+            </div>
+
+            <!-- Pulsing Rings -->
+            <div id="bubble-pulse" class="absolute inset-0 bg-ck-orange rounded-full animate-pulse-ring"></div>
+            
+            <!-- Main Bubble Button -->
+            <div class="w-16 h-16 bg-gradient-to-tr from-ck-orange to-orange-500 rounded-full shadow-[0_10px_25px_rgba(255,87,34,0.6)] flex items-center justify-center relative z-10 border-2 border-white/20 hover:scale-110 transition-transform duration-300">
+                <span class="text-white font-black text-xl italic tracking-tighter">CK</span>
+                <!-- Notification Dot -->
+                <div id="bubble-dot" class="absolute top-0 right-0 w-4 h-4 bg-red-500 border-2 border-white rounded-full"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Initialization / Logic -->
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // State Elements
+        const ckPanel = document.getElementById('ck-panel');
+        const tooltip = document.getElementById('bubble-tooltip');
+        const bubbleTrigger = document.getElementById('ck-bubble-trigger');
+        const bubblePulse = document.getElementById('bubble-pulse');
+        const bubbleDot = document.getElementById('bubble-dot');
+        const activateBtn = document.getElementById('activate-btn');
+        const activateText = document.getElementById('activate-text');
+        const storeToast = document.getElementById('store-applied-toast');
+        const savingsList = document.getElementById('store-savings-list');
+        const totalSavedDisplay = document.getElementById('store-total-saved');
+        const storePrice = document.getElementById('store-price');
+        
+        let isPanelOpen = false;
+        let isActivated = false;
+        let isCouponApplied = false;
+        let totalSavedValue = 0;
+        let currentWalletBalance = 12450;
+
+        // Auto-show panel briefly
+        let autoShowTimeout = setTimeout(() => {
+            if(!isPanelOpen && !isActivated) toggleBubble();
+        }, 1500);
+
+        function toggleBubble(event) {
+            // Stop propagation so document click listener doesn't immediately close it
+            if(event) event.stopPropagation();
+            
+            // Clear auto-show if user interacts early
+            clearTimeout(autoShowTimeout);
+            
+            isPanelOpen = !isPanelOpen;
+            
+            if (isPanelOpen) {
+                // Open State
+                ckPanel.classList.remove('hidden-panel');
+                tooltip.classList.add('opacity-0');
+                
+                // Stop floating and pulsing animation while panel is open to stabilize UI
+                bubbleTrigger.classList.remove('animate-float');
+                bubblePulse.classList.add('hidden');
+                bubbleDot.classList.add('hidden'); // Hide red dot once seen
+            } else {
+                // Closed State
+                ckPanel.classList.add('hidden-panel');
+                bubbleTrigger.classList.add('animate-float');
+                
+                if(!isActivated) {
+                    tooltip.classList.remove('opacity-0');
+                    bubblePulse.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Close panel when clicking outside
+        document.addEventListener('click', function(event) {
+            if (isPanelOpen && !ckPanel.contains(event.target) && !bubbleTrigger.contains(event.target)) {
+                toggleBubble();
+            }
+        });
+
+        // Tab Switching Logic
+        function switchTab(tabId) {
+            // Hide all tabs
+            ['tab-deals', 'tab-wallet', 'tab-ai'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            // Show target
+            document.getElementById(tabId).classList.remove('hidden');
+
+            // Reset Tab Buttons Styling
+            ['btn-tab-deals', 'btn-tab-wallet', 'btn-tab-ai'].forEach(id => {
+                const btn = document.getElementById(id);
+                btn.classList.remove('text-ck-orange', 'border-ck-orange');
+                btn.classList.add('text-gray-400', 'border-transparent');
+            });
+            // Highlight active tab
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.remove('text-gray-400', 'border-transparent');
+            activeBtn.classList.add('text-ck-orange', 'border-ck-orange');
+        }
+
+        // Main Cashback Activation
+        function activateDeal() {
+            if(isActivated) return;
+            
+            activateText.innerText = "Intercepting...";
+            activateBtn.querySelector('i').setAttribute('data-lucide', 'loader-2');
+            activateBtn.querySelector('i').classList.add('animate-spin');
+            activateBtn.classList.add('pointer-events-none', 'opacity-90');
+            lucide.createIcons();
+
+            setTimeout(() => {
+                isActivated = true;
+                totalSavedValue += 500; // Added 5% of 10000 = 500
+                currentWalletBalance += 500;
+                
+                // Update Button State
+                activateText.innerText = "Cashback Active";
+                activateBtn.querySelector('i').setAttribute('data-lucide', 'check-circle');
+                activateBtn.querySelector('i').classList.remove('animate-spin');
+                activateBtn.classList.remove('bg-ck-orange', 'hover:bg-orange-600', 'opacity-90');
+                activateBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                
+                // Update Wallet Tab
+                document.getElementById('wallet-balance-display').innerText = '₹' + currentWalletBalance.toLocaleString();
+                
+                // Update Store UI
+                updateStoreToast('Cashback');
+                fireConfetti();
+                lucide.createIcons();
+                
+                // Change Tooltip for closed state
+                tooltip.innerHTML = "Rewards Tracked <i data-lucide='check' class='inline w-3 h-3 text-green-400'></i>";
+                lucide.createIcons();
+
+            }, 1000);
+        }
+
+        // Coupon Scanner Simulation (Honey-style)
+        function runCouponScanner() {
+            if(isCouponApplied) return;
+            
+            const btn = document.getElementById('apply-coupons-btn');
+            const scanner = document.getElementById('coupon-scanner');
+            const scannerText = document.getElementById('scanner-text');
+            
+            btn.classList.add('hidden');
+            scanner.classList.remove('hidden');
+            
+            const codes = ['TESTING: SAVE10', 'TESTING: FREEDEL', 'TESTING: AUDIO20', 'TESTING: FLIPKART50'];
+            let i = 0;
+            
+            // Rapid text changing effect
+            const scanInterval = setInterval(() => {
+                scannerText.innerText = codes[i % codes.length];
+                i++;
+            }, 300);
+
+            // Finish scan after 2.5s
+            setTimeout(() => {
+                clearInterval(scanInterval);
+                isCouponApplied = true;
+                totalSavedValue += 250; // Found coupon savings
+                currentWalletBalance += 250;
+                
+                // Change price on Flipkart
+                storePrice.innerText = '₹9,749'; 
+                
+                // Update Panel UI
+                scanner.classList.add('hidden');
+                btn.classList.remove('hidden', 'bg-gray-700', 'hover:bg-gray-600');
+                btn.classList.add('bg-green-600', 'pointer-events-none', 'text-white');
+                btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> 'AUDIO20' Applied (Saved ₹250)`;
+                
+                // Update Wallet Tab
+                document.getElementById('wallet-balance-display').innerText = '₹' + currentWalletBalance.toLocaleString();
+
+                updateStoreToast('Coupon');
+                fireConfetti();
+                lucide.createIcons();
+            }, 2500);
+        }
+
+        // Update Store Toast based on actions
+        function updateStoreToast(source) {
+            storeToast.classList.remove('hidden');
+            
+            if(source === 'Coupon') {
+                savingsList.innerHTML += `<li class="flex items-center gap-2"><i data-lucide="ticket" class="w-3 h-3 text-yellow-600"></i> Code AUDIO20 applied (-₹250)</li>`;
+            }
+            
+            totalSavedDisplay.innerText = '₹' + totalSavedValue;
+            lucide.createIcons();
+        }
+
+        function fireConfetti() {
+            var duration = 2 * 1000;
+            var animationEnd = Date.now() + duration;
+            var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
+
+            function randomInRange(min, max) { return Math.random() * (max - min) + min; }
+
+            var interval = setInterval(function() {
+                var timeLeft = animationEnd - Date.now();
+                if (timeLeft <= 0) return clearInterval(interval);
+                var particleCount = 50 * (timeLeft / duration);
+                confetti(Object.assign({}, defaults, { 
+                    particleCount,
+                    origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+                    colors: ['#FF5722', '#ffffff', '#4ade80', '#FFE500']
+                }));
+            }, 250);
+        }
+    </script>
+</body>
+</html>
